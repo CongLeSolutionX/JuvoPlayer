@@ -74,8 +74,7 @@ def printBanner(banner):
 
 def readList(path):
     with open(path, 'r') as f:
-        lines = [l for l in (line.strip() for line in f) if l]
-        return lines
+        return [l for l in (line.strip() for line in f) if l]
 
 
 def readCopyright(path):
@@ -108,7 +107,7 @@ def isListed(path, extensionList):
 
 def displayHelp(scriptName):
     settings.silent = False
-    printf("Usage: python %s [OPTION]... [FILE]..." % scriptName)
+    printf(f"Usage: python {scriptName} [OPTION]... [FILE]...")
     printf("Check whitelisted and not blacklisted files for copyright notice.")
     printf("")
     printf("Default mode is settings.dryrun; process returns number of files t"
@@ -188,7 +187,7 @@ def fixCopyright(path, copyright):
 def createBackupFile(path, extension):
     if settings.dryrun or not settings.backup:
         return
-    shutil.copyfile(path, path + "." + extension)
+    shutil.copyfile(path, f"{path}.{extension}")
 
 #############################
 # file processing functions #
@@ -200,33 +199,31 @@ def getFilelist(rootDir):
     for dirName, subdirList, fileList in os.walk(rootDir):
         if "thirdparty" in dirName or ".git" in dirName:
             continue
-        for fname in fileList:
-                paths.append(dirName + '/' + fname)
+        paths.extend(f'{dirName}/{fname}' for fname in fileList)
     return paths
 
 
 def processFile(path, copyright, regex):
     with open(path) as open_file:
         content = open_file.read()
-        if not containsCopyright(content, regex):
-            diffRatio = difflib.SequenceMatcher(None,
-                                                copyright,
-                                                content[: len(copyright)])\
-                                                        .ratio()
-            # 0.6 is regarded as threshold for diff similarity
-            closeEnough = diffRatio >= 0.6
-            printf("%s | %f | %s" % ("~REPLACE" if closeEnough else "+PREPEND",
-                                     diffRatio,
-                                     path))
-            createBackupFile(path, "bak")
-            if closeEnough:
-                fixCopyright(path, copyright)
-                return "fix"
-            else:
-                prependWithCopyright(path, copyright)
-                return "prep"
-        else:
+        if containsCopyright(content, regex):
             return "ok"
+        diffRatio = difflib.SequenceMatcher(None,
+                                            copyright,
+                                            content[: len(copyright)])\
+                                                    .ratio()
+        # 0.6 is regarded as threshold for diff similarity
+        closeEnough = diffRatio >= 0.6
+        printf("%s | %f | %s" % ("~REPLACE" if closeEnough else "+PREPEND",
+                                 diffRatio,
+                                 path))
+        createBackupFile(path, "bak")
+        if closeEnough:
+            fixCopyright(path, copyright)
+            return "fix"
+        else:
+            prependWithCopyright(path, copyright)
+            return "prep"
 
 
 def processFiles(paths, copyright, whitelist, blacklist):
@@ -365,7 +362,7 @@ if __name__ == "__main__":
     try:
         args, vals = getopt.getopt(argList, unixOpts, gnuOpts)
     except getopt.error as err:
-        print(str(err))
+        print(err)
         sys.exit(-1)
     for arg, val in args:
         if arg in ("-h", "--help"):
@@ -404,7 +401,7 @@ if __name__ == "__main__":
     blacklist = readList(settings.blacklistFile)
     printf("[!] blacklist=%s\n" % blacklist)
     printf("[!] settings.workingDir='%s'\n" % settings.workingDir)
-    printf("[!] filelist=%s" % vals)
+    printf(f"[!] filelist={vals}")
 
     if not vals:
         printBanner("PROCESSING FILES")
